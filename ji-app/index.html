@@ -564,7 +564,10 @@ body {
 .photo-viewer { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; z-index: 3000; flex-direction: column; padding: 20px; }
 .photo-viewer.show { display: flex; }
 .photo-viewer img { max-width: 100%; max-height: 75vh; border-radius: 8px; }
-.pv-close { margin-top: 16px; padding: 8px 20px; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; background: rgba(255,255,255,0.2); color: #fff; }
+.pv-actions { display:flex; gap:10px; margin-top:16px; justify-content:center; }
+.pv-close,.pv-delete { padding: 9px 20px; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; color: #fff; }
+.pv-close { background: rgba(255,255,255,0.2); }
+.pv-delete { background: #c0472f; }
 
 /* ===== Toast ===== */
 .toast { position: fixed; bottom: calc(30px + var(--safe-bottom)); left: 50%; transform: translateX(-50%) translateY(40px); background: rgba(26,26,26,0.9); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: all 0.3s; z-index: 4000; pointer-events: none; max-width: 85%; text-align: center; }
@@ -1232,7 +1235,10 @@ body{background:radial-gradient(900px 300px at 90% -90px,#dde5df 0%,transparent 
 <!-- Photo Viewer -->
 <div class="photo-viewer" id="photoViewer">
   <img id="pvImg" src="">
-  <button class="pv-close" onclick="closePhotoViewer()">关闭</button>
+  <div class="pv-actions">
+    <button class="pv-delete" id="pvDeleteBtn" onclick="deleteViewedPhoto()">删除照片</button>
+    <button class="pv-close" onclick="closePhotoViewer()">关闭</button>
+  </div>
 </div>
 
 <!-- Floating Action Button -->
@@ -1389,6 +1395,7 @@ let selectedType = 'chuchai';
 let formPhotos = [];
 let checklistPhotoTarget = null;
 let currentPhotoViewerSrc = null;
+let currentPhotoViewerTarget = null;
 let justChecked = null;
 const buzz = () => { try { navigator.vibrate && navigator.vibrate(8); } catch(e) {} };
 let selectedTheme = 'navy';
@@ -1763,8 +1770,27 @@ function viewChecklistPhoto(i) {
   const item = appData[currentCat].items[i];
   if (!item.photo) return;
   currentPhotoViewerSrc = 'checklist';
+  currentPhotoViewerTarget = { catIdx: currentCat, itemIdx: i };
   document.getElementById('pvImg').src = item.photo;
+  document.getElementById('pvDeleteBtn').style.display = '';
   document.getElementById('photoViewer').classList.add('show');
+}
+
+function deleteViewedPhoto() {
+  if (currentPhotoViewerSrc !== 'checklist' || !currentPhotoViewerTarget) {
+    showToast('当前照片暂不支持在此处删除');
+    return;
+  }
+  const target = currentPhotoViewerTarget;
+  const item = appData[target.catIdx] && appData[target.catIdx].items[target.itemIdx];
+  if (!item || !item.photo) { closePhotoViewer(); return; }
+  showConfirm('删除照片', '确定删除这张照片？删除后无法恢复。', () => {
+    item.photo = null;
+    saveChecklist();
+    closePhotoViewer();
+    renderList();
+    showToast('照片已删除');
+  });
 }
 
 // Camera input handler (shared)
@@ -3916,7 +3942,7 @@ document.getElementById('confirmOkBtn').onclick = function() {
 document.querySelectorAll('.modal-overlay').forEach(o => {
   o.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('show'); });
 });
-function closePhotoViewer() { document.getElementById('photoViewer').classList.remove('show'); currentPhotoViewerSrc = null; }
+function closePhotoViewer() { document.getElementById('photoViewer').classList.remove('show'); currentPhotoViewerSrc = null; currentPhotoViewerTarget = null; }
 document.getElementById('photoViewer').addEventListener('click', function(e) { if (e.target === this) closePhotoViewer(); });
 document.getElementById('imgPreviewOverlay').addEventListener('click', function(e) { if (e.target === this) closeImgPreview(); });
 function showToast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2500); }
