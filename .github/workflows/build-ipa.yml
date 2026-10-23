@@ -1,0 +1,58 @@
+name: Build Ji IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "ji-ios-update/**"
+      - ".github/workflows/build-ipa.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ji-ios-update
+        run: xcodegen generate --spec project.yml
+
+      - name: Build unsigned iOS app
+        working-directory: ji-ios-update
+        run: |
+          xcodebuild \
+            -project Ji.xcodeproj \
+            -scheme Ji \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package IPA
+        working-directory: ji-ios-update
+        run: |
+          APP_PATH="build/Build/Products/Release-iphoneos/Ji.app"
+          test -d "$APP_PATH"
+          mkdir -p ipa/Payload
+          cp -R "$APP_PATH" ipa/Payload/Ji.app
+          cd ipa
+          /usr/bin/zip -qry ../Ji.ipa Payload
+          cd ..
+          test -s Ji.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ji-unsigned-IPA
+          path: ji-ios-update/Ji.ipa
+          if-no-files-found: error
+          retention-days: 14
